@@ -1,0 +1,8 @@
+101|payal|21
+103|Nandani Rathore|34
+102|Harish Rathore|17
+104|Mahima Rathore|21
+106|Jai singh |23
+107|Nandu Rathore|45
+108|Diya Rathore|32
+109|Ekta kumari|32
