@@ -2,6 +2,9 @@
 #include<stdlib.h>
 #include<string.h>
 // stdlib is the library in which malloc() , calloc() and free() functions are declared
+#include<errno.h> // used to detect integer overflow
+#include<ctype.h> //isSpace is declared in this lib
+#include<limits.h>  
 
 #define NAME_SIZE 100
 #define MIN_TICKET 1
@@ -17,6 +20,7 @@ struct ticket{
 };
 
 // function decleration
+int readIntegerInput(int *value);
 struct ticket *createBooking(void);
 
 int inputCustomerName(struct ticket *t1);
@@ -35,6 +39,54 @@ void printBill(struct ticket *t1, float subtotal,float discount, float bill);
 void freeBooking(struct ticket *t1);
 
 //  function defination 
+
+
+int readIntegerInput(int *value) {
+    char line[100];
+    char *end;
+    long num;
+
+    if (fgets(line, sizeof(line), stdin) == NULL) {
+        printf("Invalid input.\n");
+        return 0;
+    }
+
+    // Reject input that is longer than the buffer
+    if (strchr(line, '\n') == NULL && !feof(stdin)) {
+        int ch;
+
+        while ((ch = getchar()) != '\n' && ch != EOF) {
+            // Clear the remaining input
+        }
+
+        printf("Invalid input. Please enter a valid integer.\n");
+        return 0;
+    }
+
+    errno = 0;
+    num = strtol(line, &end, 10);
+
+    // Check whether an integer was entered
+    if (end == line || errno == ERANGE ||
+        num < INT_MIN || num > INT_MAX) {
+        printf("Invalid input. Please enter a valid integer.\n");
+        return 0;
+    }
+
+    // Allow space after the number, but reject other characters
+    while (isspace((unsigned char)*end)) {
+        end++;
+    }
+
+    if (*end != '\0') {
+        printf("Extra characters are not allowed.\n");
+        return 0;
+    }
+
+    *value = (int)num;
+    return 1;
+}
+
 
 struct ticket *createBooking(void){
     struct ticket *t1 = calloc(1,sizeof(struct ticket));
@@ -80,10 +132,9 @@ int inputCustomerName(struct ticket *t1) {
 }
 
 int inputNoOfTicket(struct ticket *t1){
-    printf("Enter no. of tickets:");
-    
-    if(scanf("%d" , t1->ticket_count) != 1){
-        printf("Invalid ticket count.\n");
+    printf("Enter no. of tickets :");
+
+    if(!readIntegerInput(t1->ticket_count)){
         return 0;
     }
 
@@ -102,8 +153,7 @@ int inputCategory(struct ticket *t1){
     printf("3.Recliner Rs %d\n" , RECLINER_PRICE);
 
     printf("Enter Category choice:");
-    if (scanf("%d", t1->category) != 1) {
-        printf("Invalid category input!\n");
+    if (!readIntegerInput(t1->category)){
         return 0;
     }
 
@@ -167,7 +217,7 @@ float calculateFinalBill(float subtotal ,float discount){
 }
 
 const char *ticketCategoryName(struct ticket *t1) {
-    switch (*t1->category) {
+    switch (*t1 -> category) {
         case 1:
             return "Standard";
 
