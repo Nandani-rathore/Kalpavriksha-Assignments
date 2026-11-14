@@ -142,11 +142,27 @@ void displayCompleteHierarchy(struct Employee **employees, int count)
         return;
     }
 
-    for (int i = 0; i < count; i++)
-        if (employees[i]->manager == NULL)
-            displayEmployeeHierarchy(employees[i], 0);
+    struct Employee *ceo = NULL;
 
-    printf("\nTotal employees: %d\n", count);
+    for (int i = 0; i < count; i++) {
+
+        if (employees[i]->manager == NULL) {
+
+            if (ceo != NULL) {
+                printf("Error: Multiple CEOs found in the hierarchy.\n");
+                return;
+            }
+
+            ceo = employees[i];
+        }
+    }
+
+    if (ceo != NULL) {
+        displayEmployeeHierarchy(ceo, 0);
+    }
+    else {
+        printf("No CEO found.\n");
+    }
 }
 
 
@@ -182,16 +198,20 @@ int addEmployee(struct Employee ***employees, int *count)
 
         if (result == -1)
             return 0;
+
         if (result == 0)
             continue;
+
         if (id <= 0) {
             printf("ID must be positive.\n");
             continue;
         }
+
         if (findEmployee(*employees, *count, id) != NULL) {
             printf("Employee ID already exists.\n");
             continue;
         }
+
         break;
     }
 
@@ -215,17 +235,21 @@ int addEmployee(struct Employee ***employees, int *count)
 
     if (*count == 0) {
         printf("This employee will be the CEO.\n");
-    } else {
+    }
+    else {
         while (1) {
             int managerId;
+
             result = readInteger("Enter manager ID: ", &managerId);
 
             if (result == -1) {
                 free(e);
                 return 0;
             }
+
             if (result == 0)
                 continue;
+
             if (managerId == 0) {
                 printf("Every non-CEO employee needs a manager.\n");
                 continue;
@@ -240,43 +264,69 @@ int addEmployee(struct Employee ***employees, int *count)
         }
     }
 
-    // Resize the main employee array
-    struct Employee **temp = realloc(
-        *employees, (*count + 1) * sizeof(struct Employee *)
+    // Step 1: Allocate new main employee array
+    struct Employee **newEmployees = malloc(
+        (*count + 1) * sizeof(struct Employee *)
     );
 
-    if (temp == NULL) {
+    if (newEmployees == NULL) {
         free(e);
         printf("Memory allocation failed.\n");
         return 0;
     }
 
-    *employees = temp;
+    // Copy existing employee pointers
+    for (int i = 0; i < *count; i++) {
+        newEmployees[i] = (*employees)[i];
+    }
 
-    // Add employee to the manager's reports
+    // Step 2: Allocate new manager reports array
+    struct Employee **newReports = NULL;
+
     if (manager != NULL) {
-        struct Employee **reports = realloc(
-            manager->reports,
+        newReports = malloc(
             (manager->reportCount + 1) * sizeof(struct Employee *)
         );
 
-        if (reports == NULL) {
+        if (newReports == NULL) {
+            free(newEmployees);
             free(e);
+
             printf("Memory allocation failed.\n");
             return 0;
         }
 
-        manager->reports = reports;
-        manager->reports[manager->reportCount++] = e;
+        // Copy existing report pointers
+        for (int i = 0; i < manager->reportCount; i++) {
+            newReports[i] = manager->reports[i];
+        }
+    }
+
+    // Step 3: All allocations succeeded.
+    // Now update the original arrays.
+
+    free(*employees);
+    *employees = newEmployees;
+
+    if (manager != NULL) {
+        free(manager->reports);
+
+        manager->reports = newReports;
+        manager->reports[manager->reportCount] = e;
+        manager->reportCount++;
+
         e->manager = manager;
     }
 
+    // Step 4: Add employee to main array
     (*employees)[*count] = e;
     (*count)++;
 
     printf("Employee added successfully.\n");
+
     return 1;
 }
+
 
 
 // remove employee
@@ -294,6 +344,7 @@ int removeEmployee(struct Employee ***employees, int *count, int id)
     struct Employee *target = list[index];
     struct Employee *manager = target->manager;
 
+    // The organization has exactly one CEO, and the CEO cannot be removed.
     if (manager == NULL) {
         printf("CEO cannot be removed.\n");
         return 0;
@@ -355,26 +406,93 @@ int removeEmployee(struct Employee ***employees, int *count, int id)
     }
 
     // Copy manager's reports
+
     int k = 0;
 
-    for (int i = 0; i < manager->reportCount; i++)
-        if (manager->reports[i] != target)
-            newManagerReports[k++] = manager->reports[i];
+    if (newManagerReports != NULL) {
 
+        for (int i = 0; i < manager->reportCount; i++) {
+
+            if (manager->reports[i] != target) {
+
+                if (k >= managerCount) {
+                    printf("Error: Manager report count mismatch.\n");
+                    free(newManagerReports);
+                    free(newDestinationReports);
+                    return 0;
+                }
+
+                newManagerReports[k++] = manager->reports[i];
+            }
+        }
+    }
+
+    // Verify the number of copied manager reports
+    if (k != manager->reportCount - 1) {
+        printf("Error: Manager report count mismatch.\n");
+        free(newManagerReports);
+        free(newDestinationReports);
+        return 0;
+    }
     // No siblings: add the removed employee's children to the manager
-    if (destination == manager)
-        for (int i = 0; i < children; i++)
+    if (destination == manager) {
+        for (int i = 0; i < children; i++) {
+
+            if (k >= managerCount) {
+                printf("Error: Manager report count mismatch.\n");
+                free(newManagerReports);
+                free(newDestinationReports);
+                return 0;
+            }
+
             newManagerReports[k++] = target->reports[i];
+        }
+    }
+
+
+    if (destination == manager && k != managerCount) {
+        printf("Error: Final manager report count mismatch.\n");
+        free(newManagerReports);
+        free(newDestinationReports);
+        return 0;
+    }
 
     // Sibling exists: copy their reports and append transferred children
     if (destination != manager && children > 0) {
-        k = 0;
 
-        for (int i = 0; i < destination->reportCount; i++)
-            newDestinationReports[k++] = destination->reports[i];
+        int destinationCount = destination->reportCount + children;
+        int destinationIndex = 0;
 
-        for (int i = 0; i < children; i++)
-            newDestinationReports[k++] = target->reports[i];
+        for (int i = 0; i < destination->reportCount; i++) {
+            if (destinationIndex >= destinationCount) {
+                printf("Error: Destination report count mismatch.\n");
+                free(newManagerReports);
+                free(newDestinationReports);
+                return 0;
+            }
+
+            newDestinationReports[destinationIndex++] =
+                destination->reports[i];
+        }
+
+        for (int i = 0; i < children; i++) {
+            if (destinationIndex >= destinationCount) {
+                printf("Error: Destination report count mismatch.\n");
+                free(newManagerReports);
+                free(newDestinationReports);
+                return 0;
+            }
+
+            newDestinationReports[destinationIndex++] =
+                target->reports[i];
+        }
+
+        if (destinationIndex != destinationCount) {
+            printf("Error: Destination report count mismatch.\n");
+            free(newManagerReports);
+            free(newDestinationReports);
+            return 0;
+        }
     }
 
     free(manager->reports);
@@ -429,6 +547,8 @@ void freeAllEmployees(struct Employee **employees, int count)
     free(employees);
 }
 
+
+
 // menu driven 
 void menuDriven(void)
 {
@@ -457,8 +577,19 @@ void menuDriven(void)
 
             case 2: {
                 int id;
-                if (readInteger("Enter employee ID to remove: ", &id) == 1)
+
+                int idResult = readInteger("Enter employee ID to remove: ", &id);
+
+                if (idResult == -1) {
+                    printf("\nInput ended. Exiting program...\n");
+                    freeAllEmployees(employees, count);
+                    return;
+                }
+
+                if (idResult == 1) {
                     removeEmployee(&employees, &count, id);
+                }
+
                 break;
             }
 
