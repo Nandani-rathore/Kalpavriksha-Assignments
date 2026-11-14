@@ -5,79 +5,61 @@
 #include<errno.h>
 #include<time.h>
 
-int takeNInput(){
+int getMatrixSize(){
     char input[100];
     char *end;
     long n;
     
-    printf("Enter the value of n:");
+    while(1){
+        printf("Enter the value of n:");
 
-    if(fgets(input , sizeof(input) , stdin) == NULL){
-        printf("Invalid input\n");
-        return 0;
-    }
-
-    if (strchr(input, '\n') == NULL && !feof(stdin)) {
-        int ch;
-        while ((ch = getchar()) != '\n' && ch != EOF) {
+        if(fgets(input , sizeof(input) , stdin) == NULL){
+            printf("Invalid input\n");
+            return 0;
         }
-        printf("Input is too long.\n");
-        return 0;
+
+        if (strchr(input, '\n') == NULL && !feof(stdin)) {
+            int ch;
+            while ((ch = getchar()) != '\n' && ch != EOF) {
+            }
+            printf("Input is too long.\n");
+            continue;
+        }
+
+        errno = 0;
+        n = strtol(input , &end , 10);
+
+        if(end == input){
+            printf("please enter a number.\n");
+            continue;
+        }
+
+        if(errno == ERANGE){
+            printf("Enter no. is too big or too small.\n");
+            continue;
+        }
+
+        while(isspace((unsigned char)*end)){
+            end++;
+        }
+
+        if(*end != '\0'){
+            printf("invalid input! please enter a integer only.\n");
+            continue;
+        }
+
+        if(n < 2 || n > 10){
+            printf("n must be between 2 and 10.\n");
+            continue;
+        }
+
+        return (int)n;
     }
-
-    errno = 0;
-    n = strtol(input , &end , 10);
-
-    if(end == input){
-        printf("please enter a number.\n");
-        return 0;
-    }
-
-    if(errno == ERANGE){
-        printf("Enter no. is too big or too small.");
-        return 0;
-    }
-
-    while(isspace((unsigned char)*end)){
-        end++;
-    }
-
-    if(*end != '\0'){
-        printf("invalid input! please enter a integer only.");
-        return 0;
-    }
-
-    if(n < 2 || n > 10){
-        printf("n must be between 2 and 10.\n");
-        return 0;
-    }
-
-    return (int)n;
+    
 }
 
-
-void freePartialArray(int ***arr, int rows,int cell, int n)
-{
-    for (int i = 0; i < rows; i++) {
-        int limit = n;
-
-        if (i == rows - 1 && cell >= 0) {
-            limit = cell;
-        }
-
-        for (int j = 0; j < limit; j++) {
-            free(*(*(arr + i) + j));
-        }
-
-        free(*(arr + i));
-    }
-
-    free(arr);
-}
-
-
-int ***createArray(int n){
-    int ***arr = malloc(n *sizeof(int **));
+int **createMatrix(int n){
+    int **arr = malloc(n *sizeof(int *));
 
     if(arr == NULL){
         printf("Memory allocation failed.\n");
@@ -85,54 +67,53 @@ int ***createArray(int n){
     }
 
     for(int i = 0 ; i < n ; i++){
-        *(arr + i) = malloc(n * sizeof(int *));
+        *(arr + i) = malloc(n * sizeof(int));
 
         if(*(arr  + i) == NULL){
             printf("Row allocation failed.\n"); 
 
-            freePartialArray(arr , i,-1 , n);
+            for(int j = 0 ; j < i ; j++){
+                free(*(arr + j));
+            }
+
+            free(arr);
             return NULL;
         }
 
-        for(int j = 0 ; j < n ; j++){
-            *(*(arr + i) + j) = malloc(sizeof(int));
-
-            if(*(*(arr + i) + j) == NULL){
-                printf("Cell allocation failed.\n");
-                freePartialArray(arr , i+1 , j , n);
-                return NULL;
-            } 
-        }
     }
     return arr;
 }
 
 
-void takeArrayInput(int ***arr , int n){
-    for(int i = 0;i<n;i++){
-        for(int j = 0;j<n;j++){
-        *(*(*(arr + i) + j)) = rand() % 256;
+
+void generateSonarImage(int **arr, int n){
+    for(int i = 0; i < n; i++){
+        for(int j = 0; j < n; j++){
+            *(*(arr + i) + j) = rand() % 256;
         }
     }
 }
 
-void display(int ***arr , int n){
 
-    for(int i = 0 ; i < n ; i++){
-        for(int j = 0 ; j < n ; j++){
-            printf("%d  " , *(*(*(arr + i) + j)));
+
+void displayMatrix(int **arr, int n){
+
+    for(int i = 0; i < n; i++){
+        for(int j = 0; j < n; j++){
+            printf("%d  ", *(*(arr + i) + j));
         }
         printf("\n");
     }
 }
 
-void rotateMatrix(int ***arr , int n){
+
+void rotateMatrixClockwise(int **arr , int n){
     // rotated 90 degree clockwise 
     // transpose + reverse = 90 degree clockwise
 
     for(int i = 0 ; i < n ; i++){
         for(int j =  i+1 ; j < n ; j++){
-            int *temp = *(*(arr + i) + j);
+            int temp = *(*(arr + i) + j);
             *(*(arr + i) + j) = *(*(arr + j) + i);
             *(*(arr + j) + i) = temp;
         }
@@ -142,7 +123,7 @@ void rotateMatrix(int ***arr , int n){
     for(int i = 0 ; i < n ; i++){
         int p = 0 , q = n-1;
         while(p < q){
-            int *temp = *(*(arr + i) + p);
+            int temp = *(*(arr + i) + p);
             *(*(arr + i) + p) = *(*(arr + i) + q);
             *(*(arr + i) + q) = temp;
             p++;
@@ -151,13 +132,16 @@ void rotateMatrix(int ***arr , int n){
     }
 }
 
-void copyRow(int *temp , int ***arr , int row , int n){
-    for(int j = 0 ; j < n ; j++){
-        *(temp + j) = *(*(*(arr + row) + j));
+
+void copyRow(int *temp, int **arr, int row, int n){
+
+    for(int j = 0; j < n; j++){
+        *(temp + j) = *(*(arr + row) + j);
     }
 }
 
-int applySmoothFilter(int ***arr , int n ){
+
+int applySmoothingFilter(int **arr , int n ){
     
     int *prev = malloc(n * sizeof(int));
     int *curr = malloc(n * sizeof(int));
@@ -172,11 +156,6 @@ int applySmoothFilter(int ***arr , int n ){
         free(next);
         free(output);
         return 0;
-    }
-
-    // initilize previous 
-    for (int j = 0; j < n; j++) {
-        *(prev + j) = 0;
     }
 
     copyRow(curr , arr , 0 , n);
@@ -213,7 +192,7 @@ int applySmoothFilter(int ***arr , int n ){
             }
 
             for(int j = 0 ; j < n ; j++){
-                *(*(*(arr + i) + j)) = *(output + j);
+                *(*(arr + i) + j) = *(output + j);
             }
 
         int *temp = prev;
@@ -234,12 +213,8 @@ int applySmoothFilter(int ***arr , int n ){
     return 1;
 }
 
-void freeMemory(int ***arr , int n){
+void freeMatrix(int **arr , int n){
     for(int i = 0 ; i < n ; i++){
-        for(int j = 0 ; j < n ; j++){
-            free(*(*(arr + i)+j));
-        }
-
         free(*(arr+i));
     }
 
@@ -248,37 +223,37 @@ void freeMemory(int ***arr , int n){
 
 int main(){
     // take input n with validations
-    int n = takeNInput();
+    int n = getMatrixSize();
     if(n == 0){
         return 1;
     }
 
     srand((unsigned int)time(NULL));
-    int ***arr = createArray(n);
+    int **arr = createMatrix(n);
     if(arr == NULL){
         return 1;
     }
 
-    // Take input
-    takeArrayInput(arr , n);
+    // generate random pixel values for the sonar image
+    generateSonarImage(arr , n);
     printf("\nThe Original matrix is:\n");
-    display(arr , n);
+    displayMatrix(arr , n);
 
     // rotate matrix 
-    rotateMatrix(arr , n);
+    rotateMatrixClockwise(arr , n);
     printf("\nThe matrix after 90 degree rotation is :\n");
-    display(arr , n);
+    displayMatrix(arr , n);
 
     // apply smooth filter 3*3 -> avg of itself and neighbour
-    if(!applySmoothFilter(arr , n)){
-        freeMemory(arr , n);
+    if(!applySmoothingFilter(arr , n)){
+        freeMatrix(arr , n);
         return 1;
     }
     printf("\nArray after applying 3*3 Smoothing filter is:\n");
-    display(arr , n);
+    displayMatrix(arr , n);
 
     // free the memory
-    freeMemory(arr , n);
+    freeMatrix(arr , n);
 
     return 0;
 
