@@ -163,6 +163,8 @@ void displayCompleteHierarchy(struct Employee **employees, int count)
     else {
         printf("No CEO found.\n");
     }
+
+    printf("\nTotal employees: %d\n", count);
 }
 
 
